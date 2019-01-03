@@ -1,0 +1,80 @@
+FROM nvidia/cuda:9.0-base-ubuntu16.04
+
+LABEL com.nvidia.volumes.needed="nvidia_driver"
+
+RUN echo "deb http://developer.download.nvidia.com/compute/machine-learning/repos/ubuntu1604/x86_64 /" > /etc/apt/sources.list.d/nvidia-ml.list
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+         build-essential \
+         cmake \
+         git \
+         curl \
+         vim \
+         ca-certificates \
+         python-qt4 \
+         libjpeg-dev \
+         zip \
+         unzip  \
+         libpng-dev &&\
+     rm -rf /var/lib/apt/lists/*
+
+ENV PYTHON_VERSION=3.5
+RUN curl -o ~/miniconda.sh -O  https://repo.continuum.io/miniconda/Miniconda3-latest-Linux-x86_64.sh  && \
+     chmod +x ~/miniconda.sh && \
+     ~/miniconda.sh -b -p /opt/conda && \
+     rm ~/miniconda.sh && \
+    /opt/conda/bin/conda install conda-build
+
+WORKDIR /projects
+
+RUN /opt/conda/bin/conda create -n py35 python=3.5
+
+ENV PATH /opt/conda/envs/py35/bin:$PATH
+ENV LD_LIBRARY_PATH /usr/local/nvidia/lib:/usr/local/nvidia/lib64
+ENV USER py35
+
+CMD source activate py35
+CMD source ~/.bashrc
+
+RUN /opt/conda/bin/conda config --append channels conda-forge
+RUN /opt/conda/bin/conda install -c conda-forge --name py35 jupyterlab 
+
+# # PyTorch 1.0
+# RUN /opt/conda/bin/conda install -c pytorch --name py35 pytorch torchvision cuda90 
+
+# PyTorch 0.4
+RUN /opt/conda/bin/conda install -c pytorch --name py35 pytorch=0.4.1 torchvision cuda90
+
+# RUN /opt/conda/bin/conda install -c pytorch --name py35 pytorch-nightly
+# RUN /opt/conda/bin/conda install -c fastai --name py35 torchvision
+# RUN /opt/conda/bin/conda install -c fastai --name py35 fastai
+# RUN /opt/conda/bin/conda install -c fastai --name py35 fastprogress
+
+RUN /opt/conda/bin/conda clean -ya
+
+RUN chmod -R a+w /projects
+
+ENV PATH /opt/conda/bin:$PATH
+WORKDIR /projects
+
+ENV PATH /opt/conda/envs/py35/bin:$PATH
+
+####################################################################
+# Install other python packages
+####################################################################
+RUN pip --no-cache-dir install \
+scipy numpy pandas sklearn scikit-image matplotlib jupyter Cython \
+azure-storage h5py packaging pymongo pyyaml tensorboardx 
+
+# install opencv3 separately
+RUN /opt/conda/bin/conda install -c conda-forge --name py35 opencv
+
+# install latest imgaug
+RUN pip install git+https://github.com/aleju/imgaug
+
+# install PyCocoTools
+# Using a fork of the original that has a fix for Python 3.
+# a PR to the original repo (https://github.com/cocodataset/cocoapi/pull/50)
+# but it doesn't seem to be active anymore.
+RUN pip install --no-cache-dir git+https://github.com/waleedka/coco.git#subdirectory=PythonAPI
+
